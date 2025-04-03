@@ -54,6 +54,17 @@ def upload_to_s3(local_file, bucket_name, s3_file):
         print(f"Erreur lors de l'upload vers S3 : {e}")
         raise
 
+# Nouvelle fonction pour vérifier l'upload
+def verify_s3_upload(bucket_name, s3_file):
+    """Vérifie si le fichier a bien été uploadé sur S3."""
+    try:
+        s3_client.head_object(Bucket=bucket_name, Key=s3_file)
+        print(f"Vérification réussie : le fichier {s3_file} existe sur S3://{bucket_name}.")
+        return True
+    except Exception as e:
+        print(f"Erreur lors de la vérification de l'upload sur S3 : {e}")
+        raise Exception(f"Le fichier {s3_file} n'a pas été trouvé sur S3://{bucket_name} après l'upload.")
+
 
 class PharmaScraper:
     def __init__(self, driver, wait, download_dir):
@@ -456,8 +467,6 @@ def run_client_keys_scraping(login, password, db_path):
         "download.prompt_for_download": False,
         "download.directory_upgrade": True,
         "plugins.always_open_pdf_externally": True,
-        "safebrowsing.enabled": True,
-        "profile.managed_default_content_settings.images": 2,
     }
     options.add_experimental_option("prefs", prefs)
     driver = webdriver.Chrome(options=options)
@@ -467,33 +476,38 @@ def run_client_keys_scraping(login, password, db_path):
     clients = scraper.access_site_and_get_clients(
         "https://app.pharma.sobrus.com/", login, password
     )
-    print("Nombre de clients récupérés sur la première page :", len(clients))
     client_keys_list = []
+    count = 0  # Initialisation du compteur
+
     while True:
         print(f"Clients sur la page actuelle : {[c['nom'] for c in clients]}")
-        for client in clients:
+        total_clients_on_page = len(clients)  # Nombre de clients sur la page actuelle
+        print(f"Nombre total de clients sur cette page : {total_clients_on_page}")
+        for i, client in enumerate(clients, 1):  # i commence à 1 pour l'affichage
+            count += 1  # Incrémenter le compteur global
+            print(f"Traitement du client {count} (page client {i}/{total_clients_on_page}) : {client['nom']}")
             client_key = scraper.retrieve_client_key(client)
             if client_key and (client["nom"], client_key) not in client_keys_list:
                 client_keys_list.append((client["nom"], client_key))
-        if scraper.go_to_next_page():
-            time.sleep(2)
-            clients = scraper.get_clients_from_page()
-            print("Nombre de clients récupérés sur la nouvelle page :", len(clients))
-        else:
+            print(f"Clé récupérée pour {client['nom']} : {client_key}")
+        if not scraper.go_to_next_page():
+            print("Fin de la pagination, plus de pages à scraper.")
             break
+        print("Passage à la page suivante...")
+        clients = scraper.get_clients_from_page()
+
+    print(f"Total de clients traités : {count}")
+
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("DROP TABLE IF EXISTS client_keys")
-    conn.commit()
-    cursor.execute(
-        """
-    CREATE TABLE client_keys (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nom TEXT,
-        client_key TEXT
-    )
-    """
-    )
+    cursor.execute("""
+        CREATE TABLE client_keys (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nom TEXT,
+            client_key TEXT
+        )
+    """)
     for nom, client_key in client_keys_list:
         cursor.execute(
             "INSERT INTO client_keys (nom, client_key) VALUES (?, ?)", (nom, client_key)
@@ -506,6 +520,12 @@ def run_client_keys_scraping(login, password, db_path):
         print(row)
     conn.close()
     driver.quit()
+
+    # Upload de la base de données vers S3
+    print("Upload de la base de données vers S3 après la recherche des clés clients...")
+    upload_to_s3(db_path, bucket_name, os.path.basename(db_path))
+    # Vérification de l'upload
+    verify_s3_upload(bucket_name, os.path.basename(db_path))
 
 
 def run_pdf_extraction(login, password, db_path):
@@ -641,7 +661,11 @@ def run_pdf_extraction(login, password, db_path):
     conn.commit()
     conn.close()
 
+    print("Upload de la base de données vers S3 après l'extraction des données PDF...")
     upload_to_s3(db_path, bucket_name, os.path.basename(db_path))
+    # Vérification de l'upload
+    verify_s3_upload(bucket_name, os.path.basename(db_path))
+
     print("Script terminé avec succès!")
     driver.quit()
 
@@ -768,6 +792,9 @@ def run_single_client_pdf_extraction(login, password, db_path, client_name):
 
     print(f"Upload de la base vers S3 : {db_path}")
     upload_to_s3(db_path, bucket_name, os.path.basename(db_path))
+    # Vérification de l'upload
+    verify_s3_upload(bucket_name, os.path.basename(db_path))
+
     print(f"Mise à jour réussie pour le client {client_name}")
     driver.quit()
     print("Driver Chrome fermé.")

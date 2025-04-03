@@ -426,16 +426,19 @@ def display_work_interface(login, password, db_path, s3_db_name):
                             # Mettre à jour l’affichage final
                             output_container.text("\n".join(stdout_output))
                             if stderr_output:
-                                st.error(f"Erreurs détaillées : {'\n'.join(stderr_output)}")
+                                error_message = '\n'.join(stderr_output)  # Évaluer avant la f-string
+                                st.error(f"Erreurs détaillées : {error_message}")
 
                             if process.returncode == 0:
                                 st.success(f"Mise à jour terminée pour {selected_client}.")
                                 download_from_s3(bucket_name, s3_db_name, local_db)
                                 st.rerun()
                             else:
-                                st.error(f"Échec de la mise à jour pour {selected_client} : {'\n'.join(stderr_output)}")
+                                error_message = '\n'.join(stderr_output)  # Évaluer avant la f-string
+                                st.error(f"Échec de la mise à jour pour {selected_client} : {error_message}")
                             if stderr_output:
-                                st.error(f"Erreurs détaillées : {' '.join(stderr_output)}")
+                                error_message = '\n'.join(stderr_output)  # Évaluer avant la f-string
+                                st.error(f"Erreurs détaillées : {error_message}")
                 else:
                     st.write("Affichage de tous les clients.")
             else:

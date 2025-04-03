@@ -1,0 +1,8 @@
+venv/
+*.pyc
+__pycache__/
+*.db
+downloads/
+.env
+.streamlit/
+.idea/
