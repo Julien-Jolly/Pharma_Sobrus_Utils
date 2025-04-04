@@ -20,10 +20,12 @@ if "aws" in st.secrets:
     aws_access_key_id = st.secrets["aws"]["aws_access_key_id"]
     aws_secret_access_key = st.secrets["aws"]["aws_secret_access_key"]
     region = st.secrets["aws"]["aws_default_region"]
+    bucket_name = st.secrets["aws"]["aws_bucket"]
 else:
     aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
     aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-    region = os.getenv("AWS_DEFAULT_REGION") or "eu-north-1"
+    region = os.getenv("AWS_DEFAULT_REGION")
+    bucket_name = os.getenv("AWS_BUCKET")
 
 if not aws_access_key_id or not aws_secret_access_key:
     st.error("Les identifiants AWS ne sont pas configurés correctement.")
@@ -36,7 +38,7 @@ s3_client = boto3.client(
     aws_access_key_id=aws_access_key_id,
     aws_secret_access_key=aws_secret_access_key,
 )
-bucket_name = "jujul"
+
 
 
 def download_from_s3(bucket_name, s3_file, local_file):
@@ -217,6 +219,7 @@ def display_work_interface(login, password, db_path, s3_db_name):
                 "AWS_ACCESS_KEY_ID": aws_access_key_id,
                 "AWS_SECRET_ACCESS_KEY": aws_secret_access_key,
                 "AWS_DEFAULT_REGION": region,
+                "AWS_BUCKET": bucket_name,
             }
             result = subprocess.run(
                 ["python", "main.py", option, login, password],

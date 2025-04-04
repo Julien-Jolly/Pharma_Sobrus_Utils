@@ -1,3 +1,4 @@
+
 import os
 from dotenv import load_dotenv
 import time
@@ -17,7 +18,12 @@ from selenium.common.exceptions import StaleElementReferenceException
 load_dotenv()
 aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
 aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-region = os.getenv("AWS_DEFAULT_REGION") or "eu-north-1"
+region = os.getenv("AWS_DEFAULT_REGION")
+bucket_name = os.getenv("AWS_BUCKET")
+
+# --- Constantes globales pour les dates ---
+START_DATE = "2020-01-01"  # Date de début fixe pour les extractions
+END_DATE = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")  # Date de fin dynamique (hier)
 
 # Vérification des identifiants AWS
 if not aws_access_key_id or not aws_secret_access_key:
@@ -33,7 +39,7 @@ s3_client = boto3.client(
     aws_access_key_id=aws_access_key_id,
     aws_secret_access_key=aws_secret_access_key,
 )
-bucket_name = "jujul"  # Remplacez par le nom de votre bucket S3
+
 
 # Fonction pour uploader vers S3 (déplacée ici pour être globale)
 def upload_to_s3(local_file, bucket_name, s3_file):
@@ -394,9 +400,7 @@ class PharmaScraper:
         return client_key
 
     def download_pdf_api(self, client):
-        end_date = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
-        #end_date="2022-03-31"
-        url = f"https://api.pharma.sobrus.com/customers/export-customer-statement?type=simple&start_date=2020-01-01&end_date={end_date}&customer_id={client['client_id']}"
+        url = f"https://api.pharma.sobrus.com/customers/export-customer-statement?type=simple&start_date={START_DATE}&end_date={END_DATE}&customer_id={client['client_id']}"
         print(f"Téléchargement du PDF pour {client['nom']} via l'URL: {url}")
         self.driver.get(url)
         pdf_file = self.wait_for_download()
@@ -812,6 +816,8 @@ if __name__ == "__main__":
     password = sys.argv[3]
     db_path = f"pharmacie_{login.replace('@', '_at_').replace('.', '_')}.db"  # Nom unique basé sur le login
 
+    download_dir = os.path.join(os.getcwd(), "downloads")
+
     if choice == "1":
         run_client_keys_scraping(login, password, db_path)
     elif choice == "2":
@@ -824,3 +830,10 @@ if __name__ == "__main__":
         run_single_client_pdf_extraction(login, password, db_path, client_name)
     else:
         print("Option invalide. Veuillez choisir 1, 2 ou 3.")
+
+    if os.path.exists(download_dir):
+        try:
+            shutil.rmtree(download_dir)
+            print(f"Dossier {download_dir} supprimé après exécution du processus.")
+        except Exception as e:
+            print(f"Erreur lors de la suppression finale du dossier downloads : {e}")
