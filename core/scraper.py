@@ -212,58 +212,47 @@ class PharmaScraper:
         sys.stdout.flush()
 
     def download_detailed_pdf_api_with_requests(self, client, start_date, end_date, timeout=30):
-        """Télécharge un PDF détaillé via l'API en utilisant requests."""
-        url = f"https://api.pharma.sobrus.com/customers/export-customer-statement?type=advanced&start_date={start_date}&end_date={end_date}&customer_id={client['client_id']}&details=details_with_discount"
+        url = f"https://api.pharma.sobrus.com/customers/export-customer-statement?type=advanced&start_date={start_date}&end_date={end_date}&customer_id={client['client_id']}"
         print(f"Téléchargement du PDF détaillé pour {client['nom']} via l'URL: {url}")
         sys.stdout.flush()
 
-        # Utiliser la client_key comme nom de dossier
         client_key = client['client_id']
         client_dir = os.path.join(self.download_dir, str(client_key))
         if not os.path.exists(client_dir):
             os.makedirs(client_dir)
 
-        # Ajouter un identifiant unique au nom du fichier pour éviter les conflits
-        timestamp = str(int(time.time() * 1000))  # Timestamp en millisecondes
+        timestamp = str(int(time.time() * 1000))
         pdf_filename = f"{client_key}_{timestamp}.pdf"
         pdf_path = os.path.join(client_dir, pdf_filename)
 
-        max_attempts = 2
-        for attempt in range(max_attempts):
-            try:
-                response = self.session.get(url, stream=True, timeout=timeout)
-                if response.status_code != 200:
-                    raise Exception(f"Erreur HTTP {response.status_code}: {response.text}")
+        try:
+            response = self.session.get(url, stream=True, timeout=timeout)
+            if response.status_code != 200:
+                raise Exception(f"Erreur HTTP {response.status_code}: {response.text}")
 
-                with open(pdf_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        if chunk:
-                            f.write(chunk)
+            with open(pdf_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
 
-                size = os.path.getsize(pdf_path)
-                if size < 1000:
-                    raise Exception(f"Fichier {pdf_path} trop petit ({size} bytes)")
+            size = os.path.getsize(pdf_path)
+            if size < 1000:
+                raise Exception(f"Fichier {pdf_path} trop petit ({size} bytes)")
 
-                print(f"PDF détaillé téléchargé pour {client['nom']} : {pdf_path}")
-                sys.stdout.flush()
-                return pdf_path
+            print(f"PDF détaillé téléchargé pour {client['nom']} : {pdf_path}")
+            sys.stdout.flush()
+            return pdf_path
 
-            except RequestException as e:
-                print(f"Échec téléchargement (tentative {attempt + 1}/{max_attempts}) pour {client['nom']} : {str(e)}")
-                sys.stdout.flush()
-                if attempt == max_attempts - 1:
-                    raise
-                time.sleep(1)
-            except Exception as e:
-                print(f"Erreur lors du téléchargement pour {client['nom']} : {str(e)}")
-                sys.stdout.flush()
-                if os.path.exists(pdf_path):
-                    os.remove(pdf_path)
-                raise
+        except Exception as e:
+            print(f"Erreur lors du téléchargement pour {client['nom']} : {str(e)}")
+            sys.stdout.flush()
+            if os.path.exists(pdf_path):
+                os.remove(pdf_path)
+            raise  # On propage l’erreur à detailed_pdf.py pour gestion
 
     def download_detailed_pdf_api(self, client, start_date, end_date, timeout=30):
         """Méthode originale utilisant Selenium (gardée pour compatibilité)."""
-        url = f"https://api.pharma.sobrus.com/customers/export-customer-statement?type=advanced&start_date={start_date}&end_date={end_date}&customer_id={client['client_id']}&details=details_with_discount"
+        url = f"https://api.pharma.sobrus.com/customers/export-customer-statement?type=advanced&start_date={start_date}&end_date={end_date}&customer_id={client['client_id']}"
         print(f"Téléchargement du PDF détaillé pour {client['nom']} via l'URL: {url}")
         sys.stdout.flush()
         self.ensure_session()

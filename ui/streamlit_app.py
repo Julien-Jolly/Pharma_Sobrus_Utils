@@ -52,7 +52,6 @@ def run_process(option, login, password, db_path, start_date, end_date, client_n
         stderr_output.append("Timeout.")
         process.communicate()
     output_container.text("\n".join(stdout_output))
-    # Stocker les logs dans st.session_state pour qu'ils persistent après st.rerun()
     if "process_logs" not in st.session_state:
         st.session_state.process_logs = []
     st.session_state.process_logs.append("\n".join(stdout_output))
@@ -71,7 +70,6 @@ def display_work_interface(login, password, db_path, s3_db_name):
         st.session_state.clear()
         st.rerun()
 
-    # Afficher les logs persistants
     if "process_logs" in st.session_state and st.session_state.process_logs:
         st.subheader("Logs du processus")
         for log in st.session_state.process_logs:
@@ -81,21 +79,20 @@ def display_work_interface(login, password, db_path, s3_db_name):
     if menu_option == "Recherche des clients":
         st.header("Recherche des clients")
         if st.button("Mettre à jour la liste des clients"):
-            conn.close()  # Ferme la connexion avant de lancer run_process
+            conn.close()
             success, stdout, stderr = run_process("1", login, password, db_path, datetime.date(2017, 1, 1),
                                                   datetime.date.today())
             if success:
                 st.success("Mise à jour terminée.")
             else:
                 st.error(f"Échec: {stderr}")
-            # st.text(stdout) # Remplacé par les logs persistants
 
         df_keys = pd.read_sql_query("SELECT * FROM client_keys", conn)
         if df_keys.empty:
             st.warning("Table vide, lancement automatique...")
-            conn.close()  # Ferme la connexion avant de lancer run_process
+            conn.close()
             run_process("1", login, password, db_path, datetime.date(2017, 1, 1), datetime.date.today())
-            conn = sqlite3.connect(db_path)  # Réouvre la connexion après
+            conn = sqlite3.connect(db_path)
             df_keys = pd.read_sql_query("SELECT * FROM client_keys", conn)
         st.subheader("Liste des clés clients")
         st.dataframe(df_keys.style.set_properties(**{"text-align": "right"}), use_container_width=True)
@@ -117,7 +114,7 @@ def display_work_interface(login, password, db_path, s3_db_name):
             selected_client = st.selectbox("Sélectionnez un client", client_list, key="detailed_client")
 
             if st.button(f"Mettre à jour les ventes détaillées pour {selected_client}"):
-                conn.close()  # Ferme la connexion avant de lancer run_process
+                conn.close()
                 success, stdout, stderr = run_process("4", login, password, db_path, start_date, end_date,
                                                       selected_client)
                 if success:
@@ -126,39 +123,67 @@ def display_work_interface(login, password, db_path, s3_db_name):
                     st.rerun()
                 else:
                     st.error(f"Échec: {stderr}")
-                # st.text(stdout) # Remplacé par les logs persistants
 
             if st.button("Mettre à jour tous les clients"):
                 with st.spinner("Mise à jour des ventes détaillées pour tous les clients en cours..."):
-                    conn.close()  # Ferme la connexion avant de lancer run_process
+                    conn.close()
                     success, stdout, stderr = run_process("4", login, password, db_path, start_date, end_date,
                                                           client_name=None)
+                    download_from_s3(AWS_BUCKET, s3_db_name, db_path)
+                    conn = sqlite3.connect(db_path)  # ← Reconnexion nécessaire ici
                     if success:
                         st.success("Mise à jour terminée pour tous les clients.")
-                        download_from_s3(AWS_BUCKET, s3_db_name, db_path)
                         st.rerun()
                     else:
                         st.error(f"Échec: {stderr}")
-                    # st.text(stdout) # Remplacé par les logs persistants
 
             cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='detailed_transactions'")
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='simple_transactions'")
             if cursor.fetchone():
-                df_detailed = pd.read_sql_query("SELECT * FROM detailed_transactions WHERE nom = ?", conn,
-                                                params=(selected_client,))
-                if not df_detailed.empty:
-                    st.subheader(f"Ventes détaillées pour {selected_client}")
-                    st.dataframe(df_detailed.style.format({
-                        "quantite": "{:.2f}", "prix_unitaire": "{:.2f}", "remise": "{:.2f}",
-                        "prix_unitaire_remise": "{:.2f}", "total": "{:.2f}", "solde": "{:.2f}"
+                df_simple = pd.read_sql_query("SELECT * FROM simple_transactions WHERE nom = ?", conn,
+                                              params=(selected_client,))
+                if not df_simple.empty:
+                    st.subheader(f"Mouvements pour {selected_client}")
+
+                    solde_initial = df_simple.iloc[0]["solde"] - df_simple.iloc[0]["total"]
+                    st.write(f"🔹 Solde initial (recalculé) : **{solde_initial:.2f}**")
+
+                    libelles = df_simple["libelle"].str.lower()
+                    total_ventes = df_simple[libelles.str.contains("vente") & ~libelles.str.contains("paiement") & ~libelles.str.contains("retour")]["total"].sum()
+                    total_paiements = df_simple[libelles.str.contains("paiement")]["total"].sum()
+                    total_avoirs = df_simple[libelles.str.contains("avoir")]["total"].sum()
+                    total_retours = df_simple[libelles.str.contains("retour")]["total"].sum()
+
+                    st.markdown(f"""
+                    - 💰 **Total ventes :** {total_ventes:.2f}  
+                    - 🔻 **Total paiements :** {total_paiements:.2f}  
+                    - 🟢 **Total avoirs :** {total_avoirs:.2f}  
+                    - 🔁 **Total retours :** {total_retours:.2f}
+                    """)
+
+                    st.dataframe(df_simple[["date", "reference", "libelle", "total", "solde"]].style.format({
+                        "total": "{:.2f}", "solde": "{:.2f}"
                     }).set_properties(**{"text-align": "right"}), use_container_width=True)
+
                     df_solde = pd.read_sql_query("SELECT solde FROM solde_final WHERE nom=?", conn,
                                                  params=(selected_client,))
+                    solde_final_calcule = df_simple.iloc[-1]["solde"]
                     if not df_solde.empty:
-                        st.write(f"Solde final pour {selected_client} : {float(df_solde.iloc[0]['solde']):.2f}")
+                        solde_final_pdf = float(df_solde.iloc[0]["solde"])
+                        st.markdown(f"""✅ **Solde final (calculé)** : {solde_final_calcule:.2f}  
+                        📄 **Solde final (PDF)** : {solde_final_pdf:.2f}""")
+
+                    # Export CSV
+                    st.download_button(
+                        label="📁 Exporter en CSV",
+                        data=df_simple.to_csv(index=False).encode("utf-8"),
+                        file_name=f"{selected_client}_ventes.csv",
+                        mime="text/csv"
+                    )
         else:
             st.warning("Aucune liste de clients disponible. Mettez à jour via 'Recherche des clients'.")
     conn.close()
+
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
