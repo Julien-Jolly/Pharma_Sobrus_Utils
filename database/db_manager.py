@@ -11,14 +11,14 @@ class DBManager:
 
     def init_db(self):
         with self.connect() as conn:
-            # Créer la table client_keys si elle n'existe pas
+            # Table des clés clients
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS client_keys (
                     nom TEXT PRIMARY KEY,
                     client_key TEXT
                 )
             """)
-            # Créer la table detailed_transactions si elle n'existe pas
+            # Table originale détaillée
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS detailed_transactions (
                     nom TEXT,
@@ -33,15 +33,26 @@ class DBManager:
                     solde REAL
                 )
             """)
-            # Vérifier et ajouter la colonne reference si elle n'existe pas
+            # Ajout colonne manquante si nécessaire
             cursor = conn.execute("PRAGMA table_info(detailed_transactions)")
             columns = [col[1] for col in cursor.fetchall()]
             if 'reference' not in columns:
                 conn.execute("ALTER TABLE detailed_transactions ADD COLUMN reference TEXT")
-            # Créer la table solde_final si elle n'existe pas
+            # Table des soldes finaux
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS solde_final (
                     nom TEXT PRIMARY KEY,
+                    solde REAL
+                )
+            """)
+            # Nouvelle table simplifiée
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS simple_transactions (
+                    nom TEXT,
+                    date TEXT,
+                    reference TEXT,
+                    libelle TEXT,
+                    total REAL,
                     solde REAL
                 )
             """)
@@ -68,4 +79,16 @@ class DBManager:
             """, data)
             if solde_final is not None:
                 conn.execute("INSERT OR REPLACE INTO solde_final (nom, solde) VALUES (?, ?)", (client['nom'], solde_final))
+            conn.commit()
+
+    def save_simple_transactions(self, data, solde_final, client):
+        with self.connect() as conn:
+            conn.execute("DELETE FROM simple_transactions WHERE nom = ?", (client['nom'],))
+            conn.executemany("""
+                INSERT INTO simple_transactions (nom, date, reference, libelle, total, solde)
+                VALUES (:nom, :date, :reference, :libelle, :total, :solde)
+            """, data)
+            if solde_final is not None:
+                conn.execute("INSERT OR REPLACE INTO solde_final (nom, solde) VALUES (?, ?)",
+                             (client['nom'], solde_final))
             conn.commit()

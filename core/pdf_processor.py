@@ -1,12 +1,11 @@
-import pdfplumber
 import re
-import os
 
 class PDFProcessor:
     def __init__(self):
         pass
 
     def extract_sorted_lines(self, pdf_path):
+        import pdfplumber
         all_lines = []
         with pdfplumber.open(pdf_path) as pdf:
             print(f"Nombre de pages dans {pdf_path}: {len(pdf.pages)}")
@@ -14,7 +13,7 @@ class PDFProcessor:
                 words = page.extract_words()
                 line_map = {}
                 for word in words:
-                    top = round(word['top'])  # Grouper par position Y
+                    top = round(word['top'])
                     if top not in line_map:
                         line_map[top] = []
                     line_map[top].append(word['text'])
@@ -26,164 +25,141 @@ class PDFProcessor:
             print(f"Premières lignes extraites: {all_lines[:5]}")
         return all_lines
 
+    def parse_line(self, line):
+        """
+        Extrait date, libellé, total, solde d'une ligne simple de type :
+        2024-03-27 - Paiement vente 84,91 -1 929,9
+        """
+        match = re.match(
+            r"^(\d{4}-\d{2}-\d{2})\s+(.*?)\s+(-?\d{1,3}(?:[\.,]\d{2}))\s+(-?\d{1,3}(?:[\s.,]\d{3})*[\.,]\d{2})$",
+            line.strip()
+        )
+        if match:
+            date, libelle, total_str, solde_str = match.groups()
+            total = float(total_str.replace(",", "."))
+            solde = float(solde_str.replace(" ", "").replace(",", "."))
+            return {
+                "date": date,
+                "reference": None,
+                "libelle": libelle.strip(),
+                "total_brut": total,
+                "solde_lu": solde
+            }
+        return None
+
     def extract_detailed_data(self, pdf_file, client):
+        import pdfplumber
+
+        def parse_line(line):
+            match = re.match(
+                r"^(\d{4}-\d{2}-\d{2})\s+(.*?)\s+(-?\d{1,3}(?:[\.,]\d{2}))\s+(-?\d{1,3}(?:[\s.,]\d{3})*[\.,]\d{2})$",
+                line.strip()
+            )
+            if match:
+                date, libelle, total_str, solde_str = match.groups()
+                total = float(total_str.replace(",", "."))
+                solde = float(solde_str.replace(" ", "").replace(",", "."))
+                return {
+                    "date": date,
+                    "reference": None,
+                    "libelle": libelle.strip().removeprefix("- ").strip(),
+                    "total_brut": total,
+                    "solde_lu": solde
+                }
+            return None
+
         records = []
-        solde = 0.0  # Solde initial
-        solde_final = 0.0
-        current_transaction = "Unknown"
+        solde = 0.0
+        solde_final_pdf = None
+        raw_rows = []
 
-        print(f"---- Résultat Extraction pour {client['nom']} ----")
-
+        # Lire le contenu du PDF
         lines = self.extract_sorted_lines(pdf_file)
-        print(f"Total lignes à traiter: {len(lines)}")
-        i = 0
-        while i < len(lines):
-            line = lines[i].strip()
-            print(f"Ligne {i}: {line}")
 
-            # Détection des ventes ou retours
-            vente_match = re.match(r"^(\d{4}-\d{2}-\d{2})\s+((FAC|RV)-\d+)\s+(.+)", line)
-            if vente_match:
-                date, transaction_num, transaction_type, libelle = vente_match.groups()
-                current_transaction = transaction_num
-                is_return = transaction_type.startswith("RV")
-                print(f"{date} | {transaction_num} | {'Retour' if is_return else 'Vente'} | Solde initial: {solde:.2f}")
-                i += 1
+        start_parsing = False
+        for i, line in enumerate(lines):
+            line = line.strip()
 
-                # Lignes produits
-                while i < len(lines):
-                    prod_line = lines[i].strip()
-                    if re.match(r"^Total\s+\d", prod_line, re.IGNORECASE):
-                        tokens = prod_line.split()
-                        total = float(tokens[1].replace(",", "."))
-                        # On ignore le total du PDF, on va recalculer
-                        i += 1
-                        break
-                    # Extraire tous les nombres de la ligne
-                    numbers = re.findall(r"[\d,]+(?:\.\d+)?", prod_line)
-                    if len(numbers) >= 4:
-                        # Créer un enregistrement pour chaque produit
-                        record = {
-                            "nom": client['nom'],
-                            "date": date,
-                            "reference": transaction_num,
-                            "produit": None,
-                            "quantite": None,
-                            "prix_unitaire": None,
-                            "remise": None,
-                            "prix_unitaire_remise": None,
-                            "total": None,
-                            "solde": None
-                        }
-                        # Nettoyer les nombres pour gérer les virgules
-                        cleaned_numbers = [num.replace(",", ".") for num in numbers]
-                        # Si 5 nombres (ex. 1 48,00 4,80 43,20 0)
-                        if len(cleaned_numbers) >= 5:
-                            try:
-                                quantite = int(cleaned_numbers[-5])
-                            except ValueError as e:
-                                print(f"Erreur lors de la conversion de la quantité : {cleaned_numbers[-5]}")
-                                i += 1
-                                continue
-                            pu = float(cleaned_numbers[-4])
-                            remise = float(cleaned_numbers[-3])
-                            pu_remise = float(cleaned_numbers[-2])
-                            # Ignorer le dernier nombre (total du PDF)
-                        # Si 4 nombres (ex. 6 15,00 15,00 566,19 ou 1 48,00 4,80 43,20)
-                        else:
-                            try:
-                                quantite = int(cleaned_numbers[-4])
-                            except ValueError as e:
-                                print(f"Erreur lors de la conversion de la quantité : {cleaned_numbers[-4]}")
-                                i += 1
-                                continue
-                            pu = float(cleaned_numbers[-3])
-                            remise = float(cleaned_numbers[-2])
-                            pu_remise = float(cleaned_numbers[-1])
-                            # Pour FAC : si pu = remise (ex. 15,00 15,00), remise = 0
-                            if not is_return and abs(pu - remise) < 0.01:
-                                remise = 0.0
-                                pu_remise = pu
-                            # Pour RV : remise = 0 toujours
-                            if is_return:
-                                remise = 0.0
-                                pu_remise = pu if abs(pu - pu_remise) > 0.01 else pu_remise
-                        # Calculer le total correctement
-                        total = round(quantite * pu_remise, 2)
-                        # Mettre à jour le solde
-                        solde = round(solde + total if not is_return else solde - total, 2)
-                        # Revenir en arrière pour trouver le nom du produit
-                        j = i - 1
-                        produit = ""
-                        while j >= 0 and not re.match(r"^\d{4}-\d{2}-\d{2}", lines[j]):
-                            if not re.match(r"[\d,]+\s+[\d,]+", lines[j]):  # Éviter les lignes de nombres
-                                produit = lines[j].strip()
-                                break
-                            j -= 1
-                        record.update({
-                            "produit": produit,
-                            "quantite": quantite,
-                            "prix_unitaire": pu,
-                            "remise": remise,
-                            "prix_unitaire_remise": pu_remise,
-                            "total": total if not is_return else -total,  # Total négatif pour les retours
-                            "solde": solde
-                        })
-                        records.append(record)
-                        print(f" |  |  |  | {quantite} | {pu:.2f} | {remise:.2f} | {pu_remise:.2f} | Total: {record['total']:.2f} | Solde: {solde:.2f}")
-                    i += 1
+            if "solde initial" in line.lower():
+                match = re.search(r"(\d+[ ,]?\d{0,3}(?:[.,]\d+))", line)
+                if match:
+                    solde = float(match.group(1).replace(" ", "").replace(",", "."))
+                    print(f"Solde initial détecté : {solde:.2f}")
+
+            if re.match(r"^Date\s+Transaction\s+N°\s+Libellé\s+Total\s+Solde", line, re.IGNORECASE):
+                start_parsing = True
                 continue
 
-            # Détection paiement / avoir sur 3 lignes
-            if i + 2 < len(lines):
-                label1 = lines[i].strip().lower()
-                date_and_montant = lines[i + 1].strip()
-                label2 = lines[i + 2].strip().lower()
+            if "solde final" in line.lower():
+                match = re.search(r"(\d+[ ,]?\d{0,3}(?:[.,]\d+))", line)
+                if match:
+                    solde_final_pdf = float(match.group(1).replace(" ", "").replace(",", "."))
+                    print(f"Solde final indiqué dans le PDF : {solde_final_pdf:.2f}")
+                break
 
-                if label1 in ["paiement", "avoir"] and re.match(r"^\d{4}-\d{2}-\d{2}", date_and_montant) and \
-                        label2 in ["vente", "client"]:
-                    date = date_and_montant.split()[0]
-                    montant_match = re.search(r"(\d+[.,]\d+|\d+)", date_and_montant.split(date, 1)[1])
-                    if montant_match:
-                        montant = float(montant_match.group(0).replace(",", "."))
-                        # Paiement ou avoir : soustraire du solde
-                        solde = round(solde - montant, 2)
-                        # Ajouter un enregistrement pour le paiement/avoir
-                        record = {
-                            "nom": client['nom'],
-                            "date": date,
-                            "reference": None,
-                            "produit": None,
-                            "quantite": None,
-                            "prix_unitaire": None,
-                            "remise": None,
-                            "prix_unitaire_remise": None,
-                            "total": -montant,  # Total négatif pour les paiements/avoirs
-                            "solde": solde
-                        }
-                        records.append(record)
-                        print(f"{date} | -          | {label1.capitalize()} {label2} |  |  |  |  |  | Total: {-montant:.2f} | Solde: {solde:.2f}")
-                    i += 3
-                    continue
+            if start_parsing and re.match(r"^\d{4}-\d{2}-\d{2}", line):
+                parsed = parse_line(line)
+                if parsed:
+                    parsed["nom"] = client["nom"]
+                    raw_rows.append(parsed)
 
-            # Détection du solde final
-            if "solde" in line.lower() and i + 2 < len(lines):
-                next_line = lines[i + 1].strip()
-                next_next_line = lines[i + 2].strip()
-                if "final" in next_next_line.lower():
-                    solde_match = re.match(r"([\d,]+\.\d{2})", next_line)
-                    if solde_match:
-                        solde_final = float(solde_match.group(1).replace(",", "."))
-                        print(f"Solde final détecté dans le PDF : {solde_final:.2f}")
-                        print(f"Solde calculé : {solde:.2f}")
-                        # Vérifier si le solde calculé correspond au solde final du PDF
-                        if abs(solde - solde_final) > 0.01:
-                            print(f"⚠️ Avertissement : Le solde calculé ({solde:.2f}) ne correspond pas au solde final du PDF ({solde_final:.2f})")
-                        i += 3
-                        continue
-            i += 1
+        # Étape 1 : regrouper les paiements par date
+        paiements_par_date = {}
+        for row in raw_rows:
+            if "paiement" in row["libelle"].lower():
+                date = row["date"]
+                montant = abs(row["total_brut"])
+                paiements_par_date.setdefault(date, []).append(montant)
 
-        print(f"Nombre total d'enregistrements extraits: {len(records)}")
-        if records:
-            print(f"Exemple d'enregistrement: {records[0]}")
-        return records, solde_final
+        # Étape 2 : identifier les dates où paiements = retour
+        paiements_a_ignorer = set()
+        for row in raw_rows:
+            if "retour" in row["libelle"].lower():
+                date = row["date"]
+                montant_retour = abs(row["total_brut"])
+                paiements_du_jour = paiements_par_date.get(date, [])
+                if abs(sum(paiements_du_jour) - montant_retour) < 0.01:
+                    paiements_a_ignorer.add(date)
+
+        # Retours et avoirs pour les règles précédentes
+        retours = {(r["date"], abs(r["total_brut"])) for r in raw_rows if "retour" in r["libelle"].lower()}
+        avoirs = {(r["date"], abs(r["total_brut"])) for r in raw_rows if "avoir" in r["libelle"].lower()}
+
+        for row in raw_rows:
+            date = row["date"]
+            reference = row.get("reference")
+            libelle = row["libelle"]
+            type_ligne = libelle.lower()
+            brut = abs(row["total_brut"])
+
+            if "paiement" in type_ligne:
+                montant = -brut
+            elif "retour" in type_ligne:
+                montant = -brut
+            elif "avoir" in type_ligne:
+                montant = -brut
+            else:
+                montant = brut
+
+            appliquer = True
+            if "paiement" in type_ligne and (
+                    (date, brut) in retours or (date, brut) in avoirs or date in paiements_a_ignorer):
+                appliquer = False
+
+            effet = montant if appliquer else 0.0
+            solde = round(solde + effet, 2)
+
+            records.append({
+                "nom": client["nom"],
+                "date": date,
+                "reference": reference,
+                "libelle": libelle,
+                "total": montant,
+                "solde": solde
+            })
+
+        if solde_final_pdf is not None and abs(solde - solde_final_pdf) > 0.01:
+            print(f"[AVERTISSEMENT] Solde final recalculé ({solde:.2f}) != PDF ({solde_final_pdf:.2f})")
+
+        return records, solde_final_pdf
+
