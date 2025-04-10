@@ -4,6 +4,9 @@ import time
 import sys
 import shutil
 import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from requests.exceptions import RequestException
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -11,13 +14,21 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
 from config.config import DOWNLOAD_DIR
+import json
 
 class PharmaScraper:
     def __init__(self, download_dir=None):
         self.download_dir = download_dir or DOWNLOAD_DIR
         self.login = None
         self.password = None
-        self.session = requests.Session()  # Session requests pour gérer les cookies
+        self.session = requests.Session()
+        self.cookies_file = "cookies.json"
+        if os.path.exists(self.cookies_file):
+            print("Chargement des cookies depuis cookies.json")
+            sys.stdout.flush()
+            with open(self.cookies_file, 'r') as f:
+                cookies = json.load(f)
+            self.session.cookies.update(cookies)
         self._setup_driver()
 
     def _setup_driver(self):
@@ -25,7 +36,7 @@ class PharmaScraper:
             shutil.rmtree(self.download_dir)
         os.makedirs(self.download_dir)
         options = webdriver.ChromeOptions()
-        options.add_argument("--headless")  # Activer le mode headless
+        options.add_argument("--headless")
         options.add_argument("--disable-gpu")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
@@ -38,15 +49,51 @@ class PharmaScraper:
             "profile.managed_default_content_settings.images": 2,
         }
         options.add_experimental_option("prefs", prefs)
-        self.driver = webdriver.Chrome(options=options)
+        self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         self.wait = WebDriverWait(self.driver, 20)
 
     def access_site(self, url, usern, password):
-        if self.login == usern and self.password == password and self.is_session_active():
-            print("Session déjà active, réutilisation...")
+        # Stocker les identifiants dès le début
+        self.login = usern
+        self.password = password
+
+        # Tester la validité des cookies avec un endpoint strict et vérifier leur âge
+        if os.path.exists(self.cookies_file):
+            print("Test de validité des cookies chargés...")
             sys.stdout.flush()
-            return
-        print(f"Accès à {url}")
+            with open(self.cookies_file, 'r') as f:
+                data = json.load(f)
+                cookies_timestamp = data.get("timestamp", 0)
+                cookies_age = time.time() - cookies_timestamp
+                if cookies_age > 3600:  # 15 minutes (900 secondes)
+                    print(f"Cookies trop vieux ({cookies_age:.0f}s), nouvelle authentification requise")
+                    sys.stdout.flush()
+                else:
+                    # Charger les cookies correctement depuis la sous-clé "cookies"
+                    cookie_dict = data.get("cookies", {})
+                    if not isinstance(cookie_dict, dict):
+                        print("Format des cookies invalide dans cookies.json, nouvelle authentification requise")
+                        sys.stdout.flush()
+                    else:
+                        self.session.cookies.clear()
+                        self.session.cookies.update(cookie_dict)  # Passe un dict plat {nom: valeur}
+                        test_url = "https://api.pharma.sobrus.com/customers/export-customer-statement?type=advanced&start_date=2017-01-01&end_date=2025-04-10&customer_id=2211711"
+                        try:
+                            test_response = self.session.get(test_url, timeout=10)
+                            if test_response.status_code == 200 and "Unauthorized" not in test_response.text:
+                                print("Cookies valides, authentification évitée")
+                                sys.stdout.flush()
+                                return
+                            else:
+                                print(
+                                    f"Cookies invalides (code {test_response.status_code} ou contenu invalide), nouvelle authentification requise")
+                                sys.stdout.flush()
+                        except RequestException as e:
+                            print(f"Erreur lors du test des cookies : {e}, nouvelle authentification requise")
+                            sys.stdout.flush()
+
+        # Authentification via Selenium si nécessaire
+        print(f"Accès à {url} pour nouvelle authentification")
         sys.stdout.flush()
         self.driver.get(url)
         try:
@@ -92,10 +139,10 @@ class PharmaScraper:
                 lambda driver: driver.current_url.startswith("https://app.pharma.sobrus.com/"),
                 message="Redirection après authentification échouée"
             )
-            self.login = usern
-            self.password = password
             print(f"Authentification réussie, URL actuelle : {self.driver.current_url}")
             sys.stdout.flush()
+            self.get_cookies_for_requests()
+
         except TimeoutException as e:
             print(f"Erreur de timeout lors de l’authentification : {e}")
             sys.stdout.flush()
@@ -123,6 +170,7 @@ class PharmaScraper:
                 self.access_site("https://app.pharma.sobrus.com/", self.login, self.password)
             else:
                 raise Exception("Aucune information d’authentification disponible pour restaurer la session")
+
 
     def get_clients_from_page(self):
         self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table.sob-v2-table tbody tr")))
@@ -204,12 +252,18 @@ class PharmaScraper:
             return False
 
     def get_cookies_for_requests(self):
-        """Extrait les cookies de Selenium pour les utiliser avec requests."""
-        cookies = self.driver.get_cookies()
-        for cookie in cookies:
-            self.session.cookies.set(cookie['name'], cookie['value'], domain=cookie['domain'])
-        print("Cookies extraits pour requests")
-        sys.stdout.flush()
+        if self.driver:
+            cookies = self.driver.get_cookies()
+            self.session.cookies.clear()
+            for cookie in cookies:
+                self.session.cookies.set(cookie['name'], cookie['value'], domain=cookie['domain'])
+            with open(self.cookies_file, 'w') as f:
+                json.dump({"cookies": {c['name']: c['value'] for c in cookies}, "timestamp": time.time()}, f)
+            print("Cookies extraits et sauvegardés dans cookies.json")
+            sys.stdout.flush()
+        else:
+            print("Aucun driver actif, utilisation des cookies précédemment chargés")
+            sys.stdout.flush()
 
     def download_detailed_pdf_api_with_requests(self, client, start_date, end_date, timeout=30):
         url = f"https://api.pharma.sobrus.com/customers/export-customer-statement?type=advanced&start_date={start_date}&end_date={end_date}&customer_id={client['client_id']}"
@@ -226,7 +280,7 @@ class PharmaScraper:
         pdf_path = os.path.join(client_dir, pdf_filename)
 
         try:
-            response = self.session.get(url, stream=True, timeout=timeout)
+            response = self.session.get(url, stream=True, timeout=30)
             if response.status_code != 200:
                 raise Exception(f"Erreur HTTP {response.status_code}: {response.text}")
 
