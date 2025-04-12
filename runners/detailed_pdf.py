@@ -1,9 +1,10 @@
-import logging
-import time
 import sys
 import os
-import queue
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+import logging
+import time
+import queue
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from core.scraper import PharmaScraper
 from core.pdf_processor import PDFProcessor
@@ -59,7 +60,7 @@ def run(login, password, db_path, start_date, end_date, client_name=None, scrape
         print(f"Nombre total de clients : {len(client_keys)}")
         sys.stdout.flush()
 
-        max_workers_download = 10
+        max_workers_download = 6
         download_queue = queue.Queue()
         failed_downloads = []
 

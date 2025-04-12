@@ -4,7 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ec1ee7a1-e494-4c7c-a1f1-6dad5411b2dd" name="Changes" comment="" />
+    <list default="true" id="ec1ee7a1-e494-4c7c-a1f1-6dad5411b2dd" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/scraper.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/scraper.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/runners/client_keys.py" beforeDir="false" afterPath="$PROJECT_DIR$/runners/client_keys.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/runners/detailed_pdf.py" beforeDir="false" afterPath="$PROJECT_DIR$/runners/detailed_pdf.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/streamlit_app.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/streamlit_app.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -31,24 +37,24 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ASKED_MARK_IGNORED_FILES_AS_EXCLUDED": "true",
-    "Python.Test Single Client  .executor": "Debug",
-    "Python.main.executor": "Run",
-    "Python.parse_pdf_cleaned.executor": "Run",
-    "Python.parse_pdf_final (1).executor": "Run",
-    "Python.parse_pdf_final (2).executor": "Run",
-    "Python.parse_pdf_final.executor": "Run",
-    "Python.parse_pdf_final_to_test.executor": "Run",
-    "Python.test.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "main",
-    "last_opened_file_path": "C:/Users/Julien/PycharmProjects/PythonProject/Recap_Credits_Pharma",
-    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ASKED_MARK_IGNORED_FILES_AS_EXCLUDED&quot;: &quot;true&quot;,
+    &quot;Python.Test Single Client  .executor&quot;: &quot;Debug&quot;,
+    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.parse_pdf_cleaned.executor&quot;: &quot;Run&quot;,
+    &quot;Python.parse_pdf_final (1).executor&quot;: &quot;Run&quot;,
+    &quot;Python.parse_pdf_final (2).executor&quot;: &quot;Run&quot;,
+    &quot;Python.parse_pdf_final.executor&quot;: &quot;Run&quot;,
+    &quot;Python.parse_pdf_final_to_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/Julien/PycharmProjects/PythonProject/Recap_Credits_Pharma&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\Julien\PycharmProjects\PythonProject\Pharma_Sobrus_Utils\ui" />
