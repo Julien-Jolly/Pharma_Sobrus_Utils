@@ -4,12 +4,6 @@ from runners.client_keys import run as run_client_keys
 from runners.detailed_pdf import run as run_detailed_pdf
 from core.scraper import PharmaScraper
 
-import sys
-from config.config import START_DATE, END_DATE
-from runners.client_keys import run as run_client_keys
-from runners.detailed_pdf import run as run_detailed_pdf
-from core.scraper import PharmaScraper
-
 if __name__ == "__main__":
     if len(sys.argv) < 4:
         print("Usage: python main.py <choice> <login> <password> [<client_name>] [<start_date>] [<end_date>]")
