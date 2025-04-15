@@ -57,25 +57,25 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ASKED_MARK_IGNORED_FILES_AS_EXCLUDED": "true",
-    "Python.Test Single Client  .executor": "Debug",
-    "Python.main.executor": "Run",
-    "Python.parse_pdf_cleaned.executor": "Run",
-    "Python.parse_pdf_final (1).executor": "Run",
-    "Python.parse_pdf_final (2).executor": "Run",
-    "Python.parse_pdf_final.executor": "Run",
-    "Python.parse_pdf_final_to_test.executor": "Run",
-    "Python.test.executor": "Run",
-    "Python.test_import.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "Merging main",
-    "last_opened_file_path": "C:/Users/Julien/PycharmProjects/PythonProject/Recap_Credits_Pharma",
-    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ASKED_MARK_IGNORED_FILES_AS_EXCLUDED&quot;: &quot;true&quot;,
+    &quot;Python.Test Single Client  .executor&quot;: &quot;Debug&quot;,
+    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.parse_pdf_cleaned.executor&quot;: &quot;Run&quot;,
+    &quot;Python.parse_pdf_final (1).executor&quot;: &quot;Run&quot;,
+    &quot;Python.parse_pdf_final (2).executor&quot;: &quot;Run&quot;,
+    &quot;Python.parse_pdf_final.executor&quot;: &quot;Run&quot;,
+    &quot;Python.parse_pdf_final_to_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_import.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;Merging main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/Julien/PycharmProjects/PythonProject/Recap_Credits_Pharma&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\Julien\PycharmProjects\PythonProject\Pharma_Sobrus_Utils\ui" />
