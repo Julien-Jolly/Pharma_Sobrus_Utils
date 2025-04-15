@@ -5,7 +5,30 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ec1ee7a1-e494-4c7c-a1f1-6dad5411b2dd" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/.idea/Pharma_Sobrus_Utils.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/.idea/inspectionProfiles/profiles_settings.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/.idea/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/.idea/modules.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/.idea/vcs.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/.idea/workspace.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/config/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/config/config.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/core/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/core/pdf_processor.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/core/s3_utils.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/core/scraper.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/database/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/database/db_manager.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/main.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/requirements.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/runners/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/runners/client_keys.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/runners/detailed_pdf.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/test.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/ui/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pharma_Sobrus_Utils/ui/streamlit_app.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -34,25 +57,25 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ASKED_MARK_IGNORED_FILES_AS_EXCLUDED&quot;: &quot;true&quot;,
-    &quot;Python.Test Single Client  .executor&quot;: &quot;Debug&quot;,
-    &quot;Python.main.executor&quot;: &quot;Run&quot;,
-    &quot;Python.parse_pdf_cleaned.executor&quot;: &quot;Run&quot;,
-    &quot;Python.parse_pdf_final (1).executor&quot;: &quot;Run&quot;,
-    &quot;Python.parse_pdf_final (2).executor&quot;: &quot;Run&quot;,
-    &quot;Python.parse_pdf_final.executor&quot;: &quot;Run&quot;,
-    &quot;Python.parse_pdf_final_to_test.executor&quot;: &quot;Run&quot;,
-    &quot;Python.test.executor&quot;: &quot;Run&quot;,
-    &quot;Python.test_import.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/Julien/PycharmProjects/PythonProject/Recap_Credits_Pharma&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_MARK_IGNORED_FILES_AS_EXCLUDED": "true",
+    "Python.Test Single Client  .executor": "Debug",
+    "Python.main.executor": "Run",
+    "Python.parse_pdf_cleaned.executor": "Run",
+    "Python.parse_pdf_final (1).executor": "Run",
+    "Python.parse_pdf_final (2).executor": "Run",
+    "Python.parse_pdf_final.executor": "Run",
+    "Python.parse_pdf_final_to_test.executor": "Run",
+    "Python.test.executor": "Run",
+    "Python.test_import.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "Merging main",
+    "last_opened_file_path": "C:/Users/Julien/PycharmProjects/PythonProject/Recap_Credits_Pharma",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\Julien\PycharmProjects\PythonProject\Pharma_Sobrus_Utils\ui" />
