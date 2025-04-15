@@ -5,10 +5,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ec1ee7a1-e494-4c7c-a1f1-6dad5411b2dd" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/Pharma_Sobrus_Utils.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Pharma_Sobrus_Utils.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/scraper.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/scraper.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/runners/client_keys.py" beforeDir="false" afterPath="$PROJECT_DIR$/runners/client_keys.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/runners/detailed_pdf.py" beforeDir="false" afterPath="$PROJECT_DIR$/runners/detailed_pdf.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test.py" beforeDir="false" afterPath="$PROJECT_DIR$/test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/streamlit_app.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/streamlit_app.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -47,6 +53,7 @@
     &quot;Python.parse_pdf_final.executor&quot;: &quot;Run&quot;,
     &quot;Python.parse_pdf_final_to_test.executor&quot;: &quot;Run&quot;,
     &quot;Python.test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_import.executor&quot;: &quot;Run&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,

@@ -1,5 +1,7 @@
 import sys
 import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import logging
 import time
 import re
@@ -61,125 +63,134 @@ def create_scraper(login, password, port, download_dir):
         raise
 
 def navigate_to_page(scraper, target_page, current_page=1, max_retries=3):
-    """Navigue vers la page cible en cliquant sur le bouton 'Suivant'."""
+    """Navigue vers la page cible en cliquant sur 'Suivant' ou 'Précédent' avec vérification."""
     process_name = multiprocessing.current_process().name
     if target_page < 1:
         logger.error(f"[{process_name}] Page cible invalide : {target_page}")
         return False
-
     if target_page == current_page:
         logger.info(f"[{process_name}] Déjà sur la page {current_page}")
         return True
 
     for attempt in range(1, max_retries + 1):
         try:
-            logger.info(
-                f"[{process_name}] Navigation vers page {target_page} depuis {current_page} (tentative {attempt})")
-
-            # Vérifier la page actuelle sans conversion risquée
-            try:
-                page_element = WebDriverWait(scraper.driver, 10).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "span.sob-v2-TablePage")),
-                    message="Numéro de page non trouvé"
-                )
-                page_text = page_element.text.strip()
-                displayed_page = int(page_text) if page_text else current_page
-                if displayed_page != current_page:
-                    logger.warning(
-                        f"[{process_name}] Page affichée ({displayed_page}) diffère de current_page ({current_page})")
-                    current_page = displayed_page
-            except (TimeoutException, ValueError):
-                logger.warning(f"[{process_name}] Impossible de vérifier la page actuelle, assume {current_page}")
+            logger.info(f"[{process_name}] Navigation vers page {target_page} depuis {current_page} (tentative {attempt})")
 
             # Charger la page des clients si nécessaire
             if current_page == 1 and "customers" not in scraper.driver.current_url:
+                logger.info(f"[{process_name}] Chargement initial de la page clients")
                 scraper.driver.get("https://app.pharma.sobrus.com/customers")
                 WebDriverWait(scraper.driver, 15).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "div.sob-v2-table-pagination")),
                     message="Pagination non trouvée"
                 )
-                current_page = 1
+                try:
+                    page_element = scraper.driver.find_element(By.CSS_SELECTOR, "span.sob-v2-TablePage")
+                    page_text = page_element.text.strip()
+                    if page_text.isdigit():
+                        current_page = int(page_text)
+                        logger.info(f"[{process_name}] Page initiale confirmée : {current_page}")
+                    else:
+                        logger.warning(f"[{process_name}] Numéro de page initial non numérique: {page_text}")
+                except (NoSuchElementException, ValueError):
+                    logger.warning(f"[{process_name}] Impossible de vérifier la page initiale, assume {current_page}")
 
-            steps = target_page - current_page
-            for step in range(steps):
-                for retry_click in range(3):
+            # Boucle pour atteindre la page cible
+            while current_page != target_page:
+                logger.info(f"[{process_name}] Tentative d'atteindre page {target_page} depuis {current_page}")
+                WebDriverWait(scraper.driver, 15).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.sob-v2-table-pagination")),
+                    message="Pagination non trouvée"
+                )
+
+                # Avancer ou reculer selon la position
+                if current_page < target_page:
+                    if not scraper.go_to_next_page():
+                        logger.info(f"[{process_name}] Impossible d'avancer à la page {current_page + 1}")
+                        try:
+                            next_button = scraper.driver.find_element(By.CSS_SELECTOR, "button.sob-v2-TablePage__btn:last-child")
+                            if "sob-v2-TablePage__disabled" in next_button.get_attribute("class"):
+                                logger.info(f"[{process_name}] Bouton 'Suivant' désactivé, dernière page atteinte")
+                                return False
+                        except NoSuchElementException:
+                            logger.error(f"[{process_name}] Bouton 'Suivant' non trouvé")
+                            return False
+                        return False
+                elif current_page > target_page:
+                    logger.warning(f"[{process_name}] Overshoot : sur page {current_page}, cible {target_page}")
+                    # Tenter de revenir en arrière
+                    for retry in range(3):
+                        try:
+                            prev_button = scraper.driver.find_element(By.CSS_SELECTOR, "button.sob-v2-TablePage__btn:first-child")
+                            if "sob-v2-TablePage__disabled" not in prev_button.get_attribute("class"):
+                                logger.info(f"[{process_name}] Clic sur 'Précédent' pour corriger")
+                                scraper.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", prev_button)
+                                time.sleep(1)
+                                prev_button.click()
+                                WebDriverWait(scraper.driver, 15).until(
+                                    EC.presence_of_element_located((By.CSS_SELECTOR, "table.sob-v2-table")),
+                                    message="Tableau non chargé après clic 'Précédent'"
+                                )
+                                break
+                            else:
+                                logger.warning(f"[{process_name}] Bouton 'Précédent' désactivé")
+                                return False
+                        except (NoSuchElementException, TimeoutException, ElementClickInterceptedException):
+                            logger.warning(f"[{process_name}] Échec clic 'Précédent', tentative {retry + 1}/3")
+                            if retry == 2:
+                                logger.error(f"[{process_name}] Échec correction overshoot")
+                                return False
+                            time.sleep(1)
+
+                # Vérifier le numéro de page
+                for retry in range(3):
                     try:
-                        next_button = WebDriverWait(scraper.driver, 10).until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, "button.sob-v2-TablePage__btn:last-child")),
-                            message="Bouton 'Suivant' non trouvé"
-                        )
-                        logger.info(
-                            f"[{process_name}] Bouton 'Suivant' détecté : classe={next_button.get_attribute('class')}")
-                        if "sob-v2-TablePage__disabled" in next_button.get_attribute("class"):
-                            logger.info(
-                                f"[{process_name}] Bouton 'Suivant' désactivé sur page {current_page}, dernière page atteinte")
-                            return False
-                        scraper.driver.execute_script("arguments[0].scrollIntoView(true);", next_button)
-                        time.sleep(0.5)
-                        WebDriverWait(scraper.driver, 5).until(
-                            EC.element_to_be_clickable((By.CSS_SELECTOR, "button.sob-v2-TablePage__btn:last-child"))
-                        )
-                        next_button.click()
-                        WebDriverWait(scraper.driver, 15).until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, "table.sob-v2-table")),
-                            message=f"Tableau des clients non chargé après clic 'Suivant' vers page {current_page + 1}"
-                        )
+                        page_element = scraper.driver.find_element(By.CSS_SELECTOR, "span.sob-v2-TablePage")
+                        new_page_text = page_element.text.strip()
+                        logger.info(f"[{process_name}] Numéro de page lu : '{new_page_text}'")
+                        if not new_page_text.isdigit():
+                            logger.warning(f"[{process_name}] Numéro de page non numérique, tentative {retry + 1}/3")
+                            time.sleep(1)
+                            continue
+                        current_page = int(new_page_text)
+                        logger.info(f"[{process_name}] Atteint page {current_page}")
                         break
-                    except (TimeoutException, StaleElementReferenceException, ElementClickInterceptedException) as e:
-                        logger.warning(
-                            f"[{process_name}] Échec clic 'Suivant' (tentative {retry_click + 1}/3) : {str(e)}")
-                        if retry_click == 2:
-                            logger.error(f"[{process_name}] Échec définitif du clic 'Suivant' sur page {current_page}")
-                            return False
+                    except (NoSuchElementException, StaleElementReferenceException):
+                        logger.warning(f"[{process_name}] Échec lecture page, tentative {retry + 1}/3")
                         time.sleep(1)
-
-                # Vérifier la nouvelle page
-                for retry_verify in range(3):
-                    try:
-                        page_element = WebDriverWait(scraper.driver, 10).until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, "span.sob-v2-TablePage")),
-                            message="Numéro de page non trouvé après navigation"
-                        )
-                        page_text = page_element.text.strip()
-                        new_page = int(page_text) if page_text else current_page + 1
-                        if new_page != current_page + 1:
-                            logger.error(
-                                f"[{process_name}] Navigation incorrecte : attendu page {current_page + 1}, obtenu {new_page}")
+                        if retry == 2:
+                            logger.error(f"[{process_name}] Impossible de vérifier la page")
                             return False
-                        current_page = new_page
-                        break
-                    except (TimeoutException, ValueError) as e:
-                        logger.warning(
-                            f"[{process_name}] Impossible de vérifier la page après navigation (tentative {retry_verify + 1}/3) : {str(e)}")
-                        if retry_verify == 2:
-                            logger.error(f"[{process_name}] Échec définitif de vérification page après navigation")
-                            return False
-                        time.sleep(2)
-                logger.info(f"[{process_name}] Atteint page {current_page}")
-                time.sleep(1)
 
             # Vérification finale
             try:
-                page_element = WebDriverWait(scraper.driver, 10).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "span.sob-v2-TablePage")),
-                    message="Numéro de page non trouvé"
-                )
-                page_text = page_element.text.strip()
-                final_page = int(page_text) if page_text else target_page
-                if final_page != target_page:
-                    logger.error(
-                        f"[{process_name}] Page cible {target_page} non atteinte, sur page {final_page}")
+                page_element = scraper.driver.find_element(By.CSS_SELECTOR, "span.sob-v2-TablePage")
+                final_page_text = page_element.text.strip()
+                if not final_page_text.isdigit():
+                    logger.warning(f"[{process_name}] Numéro de page final non numérique: {final_page_text}")
                     return False
-            except (TimeoutException, ValueError):
+                final_page = int(final_page_text)
+                logger.info(f"[{process_name}] Vérification finale : page {final_page}")
+                if final_page != target_page:
+                    logger.error(f"[{process_name}] Page cible {target_page} non atteinte, sur page {final_page}")
+                    return False
+            except (NoSuchElementException, ValueError):
                 logger.warning(f"[{process_name}] Impossible de vérifier la page finale")
                 return False
 
+            logger.info(f"[{process_name}] Navigation réussie vers page {target_page}")
             return True
 
-        except WebDriverException as e:
-            logger.error(f"[{process_name}] Erreur WebDriver navigation page {target_page}: {str(e)}")
-            return False
+        except (WebDriverException, TimeoutException) as e:
+            logger.error(f"[{process_name}] Erreur navigation page {target_page}: {str(e)}")
+            if attempt < max_retries:
+                logger.info(f"[{process_name}] Nouvelle tentative après 2s")
+                time.sleep(2)
+            else:
+                logger.error(f"[{process_name}] Échec définitif après {max_retries} tentatives")
+                return False
 
+    logger.error(f"[{process_name}] Échec navigation après toutes les tentatives")
     return False
 
 def process_page(page_number, login, password, db_path, scraper, port, download_dir, lock, processed_client_keys):
@@ -240,16 +251,10 @@ def process_page(page_number, login, password, db_path, scraper, port, download_
             logger.info(f"[{process_name}] Clé sauvegardée pour {client_name}: {client_key} (page {page_number})")
 
         # Vérifier si c'est la dernière page
-        try:
-            next_button = scraper.driver.find_element(
-                By.CSS_SELECTOR,
-                "button.sob-v2-TablePage__btn:last-child"
-            )
-            is_last_page = "sob-v2-TablePage__disabled" in next_button.get_attribute("class")
-            return len(clients), is_last_page
-        except NoSuchElementException:
-            logger.info(f"[{process_name}] Bouton 'Suivant' non trouvé sur page {page_number}, assume dernière page")
-            return len(clients), True
+        is_last_page = not scraper.go_to_next_page()
+        if is_last_page:
+            logger.info(f"[{process_name}] Dernière page détectée sur page {page_number}")
+        return len(clients), is_last_page
 
     except WebDriverException as e:
         logger.error(f"[{process_name}] Erreur WebDriver page {page_number}: {str(e)}")

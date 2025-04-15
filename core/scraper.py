@@ -1,7 +1,7 @@
+import sys
 import os
 import re
 import time
-import sys
 import shutil
 import requests
 import logging
@@ -12,37 +12,44 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, StaleElementReferenceException, WebDriverException
+from selenium.common.exceptions import TimeoutException, StaleElementReferenceException, WebDriverException, ElementClickInterceptedException, NoSuchElementException
 from config.config import DOWNLOAD_DIR
 import json
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler("scraper.log", mode='a'), logging.StreamHandler()]
+    handlers=[logging.StreamHandler()]  # Sortie console pour Streamlit
 )
 logger = logging.getLogger(__name__)
 
 class PharmaScraper:
-    def __init__(self, download_dir=None, login=None, password=None):
+    def __init__(self, download_dir=None, login=None, password=None, port=None):
+        logger.info("Début initialisation PharmaScraper")
         self.download_dir = download_dir or DOWNLOAD_DIR
         self.login = login
         self.password = password
+        self.port = port  # Ajouté pour identifier le worker
         self.session = requests.Session()
-        self.cookies_file = "cookies.json"
+        self.cookies_file = f"cookies_{port or 'default'}.json"  # Fichier unique par port
+        self.driver = None  # Initialiser à None
         if os.path.exists(self.cookies_file):
-            logger.info("Chargement des cookies depuis cookies.json pour requests")
+            logger.info(f"Chargement des cookies depuis {self.cookies_file} pour requests")
             with open(self.cookies_file, 'r') as f:
                 cookies = json.load(f)
             self.session.cookies.update(cookies)
         self._setup_driver()
+        logger.info("Fin initialisation PharmaScraper")
 
     def _setup_driver(self):
+        logger.info("Configuration du driver Chrome")
         if os.path.exists(self.download_dir):
             shutil.rmtree(self.download_dir)
         os.makedirs(self.download_dir)
         options = webdriver.ChromeOptions()
-        options.add_argument("--headless")
+        # options.add_argument("--headless")  # Laisser commenté pour tests
         options.add_argument("--disable-gpu")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
@@ -58,10 +65,17 @@ class PharmaScraper:
         }
         options.add_experimental_option("prefs", prefs)
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-        self.wait = WebDriverWait(self.driver, 30)
+        try:
+            self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+            self.wait = WebDriverWait(self.driver, 30)
+            logger.info("Driver Chrome configuré")
+        except Exception as e:
+            logger.error("Erreur lors de la configuration du driver: %s", str(e))
+            raise
+        logger.info("Fin configuration driver")
 
     def access_site(self, url, usern, password, force_auth=False):
+        logger.info("Début access_site: %s", url)
         self.login = usern
         self.password = password
 
@@ -76,7 +90,7 @@ class PharmaScraper:
                 else:
                     cookie_dict = data.get("cookies", {})
                     if not isinstance(cookie_dict, dict):
-                        logger.warning("Format des cookies invalide dans cookies.json, authentification requise")
+                        logger.warning("Format des cookies invalide dans %s, authentification requise", self.cookies_file)
                     else:
                         self.session.cookies.clear()
                         self.session.cookies.update(cookie_dict)
@@ -88,6 +102,7 @@ class PharmaScraper:
                                 self.driver.get("https://app.pharma.sobrus.com/")
                                 for cookie in cookie_dict.items():
                                     self.driver.add_cookie({"name": cookie[0], "value": cookie[1], "domain": ".pharma.sobrus.com"})
+                                logger.info("Cookies appliqués au driver")
                                 return
                             else:
                                 logger.info(f"Cookies invalides (code {test_response.status_code} ou contenu invalide), authentification requise")
@@ -138,8 +153,10 @@ class PharmaScraper:
         )
         logger.info(f"Authentification réussie, URL actuelle : {self.driver.current_url}")
         self.get_cookies_for_requests()
+        logger.info("Fin access_site")
 
     def is_session_active(self):
+        logger.info("Vérification session active")
         try:
             self.driver.get("https://app.pharma.sobrus.com/customers")
             if "login" in self.driver.current_url:
@@ -151,9 +168,11 @@ class PharmaScraper:
         except TimeoutException:
             logger.warning("Session inactive ou page non chargée")
             return False
+        finally:
+            logger.info("Fin vérification session")
 
     def ensure_session(self):
-        logger.info("Vérification de la session...")
+        logger.info("Début ensure_session")
         if not self.is_session_active():
             logger.warning("Session invalide ou expirée, reconnexion...")
             if self.login and self.password:
@@ -161,9 +180,10 @@ class PharmaScraper:
             else:
                 logger.error("Aucune information d’authentification disponible pour restaurer la session")
                 raise Exception("Aucune information d’authentification disponible")
+        logger.info("Fin ensure_session")
 
     def get_clients_from_page(self):
-        logger.info("Extraction des clients depuis la page")
+        logger.info("Début get_clients_from_page")
         if "login" in self.driver.current_url:
             logger.error("Redirigé vers la page de login, session invalide")
             raise Exception("Session invalide, redirection vers login")
@@ -207,7 +227,7 @@ class PharmaScraper:
         return clients
 
     def retrieve_client_key(self, client):
-        logger.info(f"Récupération clé pour {client['nom']}")
+        logger.info(f"Début retrieve_client_key pour {client['nom']}")
         client_xpath = f'//table[contains(@class, "sob-v2-table")]//tbody/tr[th/span[normalize-space()="{client["nom"]}"]]'
         client_row = self.wait.until(EC.element_to_be_clickable((By.XPATH, client_xpath)))
         self.driver.execute_script("arguments[0].scrollIntoView(true);", client_row)
@@ -219,34 +239,125 @@ class PharmaScraper:
         self.driver.get("https://app.pharma.sobrus.com/customers")
         self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table.sob-v2-table")))
         time.sleep(1)
+        logger.info(f"Fin retrieve_client_key pour {client['nom']}")
         return client_key
 
     def go_to_next_page(self):
-        logger.info("Tentative passage page suivante")
-        try:
-            pagination = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.sob-v2-table-pagination")))
-            current_page_element = pagination.find_element(By.CSS_SELECTOR, "span.sob-v2-TablePage")
-            self.wait.until(lambda d: current_page_element.text.strip().isdigit(), "Numéro de page non chargé")
-            current_page = int(current_page_element.text.strip())
-            next_button = pagination.find_element(By.XPATH, ".//span[contains(@class, 'sob-v2-TablePage')]/following-sibling::button[1]")
-            if "sob-v2-TablePage__disabled" in next_button.get_attribute("class"):
-                logger.info("Bouton suivant désactivé, dernière page")
-                return False
-            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(0.5)
-            self.driver.execute_script("arguments[0].scrollIntoView(true);", next_button)
-            time.sleep(0.5)
-            self.wait.until(EC.element_to_be_clickable(next_button))
-            self.driver.execute_script("arguments[0].click();", next_button)
-            self.wait.until(lambda d: d.find_element(By.CSS_SELECTOR, "span.sob-v2-TablePage").text.strip().isdigit() and
-                                           int(d.find_element(By.CSS_SELECTOR, "span.sob-v2-TablePage").text.strip()) > current_page)
-            logger.info(f"Passage à la page {current_page + 1}")
-            return True
-        except Exception as e:
-            logger.warning(f"Échec passage page suivante: {e}")
-            return False
+        logger.info("Début go_to_next_page")
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
+            try:
+                # S'assurer que la page des clients est chargée
+                if "customers" not in self.driver.current_url:
+                    logger.info("Rechargement de la page clients")
+                    self.driver.get("https://app.pharma.sobrus.com/customers")
+                    self.wait.until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div.sob-v2-table-pagination")),
+                        message="Pagination non trouvée après rechargement"
+                    )
+
+                # Attendre la pagination
+                self.wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.sob-v2-table-pagination")),
+                    message="Pagination non trouvée"
+                )
+
+                # Obtenir la page actuelle
+                current_page = 1  # Default si échec
+                for retry_page in range(3):
+                    try:
+                        page_element = self.driver.find_element(By.CSS_SELECTOR, "span.sob-v2-TablePage")
+                        page_text = page_element.text.strip()
+                        if not page_text.isdigit():
+                            raise ValueError(f"Numéro de page non numérique: {page_text}")
+                        current_page = int(page_text)
+                        logger.info(f"Page actuelle: {current_page}")
+                        break
+                    except (NoSuchElementException, ValueError, StaleElementReferenceException):
+                        logger.warning(f"Tentative {retry_page + 1}/3 pour lire la page actuelle")
+                        if retry_page == 2:
+                            logger.error("Échec définitif de lecture de la page actuelle")
+                            return False
+                        time.sleep(1)
+
+                # Trouver et cliquer sur le bouton "Suivant"
+                for retry_click in range(3):
+                    try:
+                        next_button = self.wait.until(
+                            EC.presence_of_element_located(
+                                (By.CSS_SELECTOR, "button.sob-v2-TablePage__btn:last-child")),
+                            message="Bouton 'Suivant' non trouvé"
+                        )
+                        logger.debug(f"Bouton 'Suivant' détecté: classe={next_button.get_attribute('class')}")
+                        if "sob-v2-TablePage__disabled" in next_button.get_attribute("class"):
+                            logger.info(f"Bouton 'Suivant' désactivé sur page {current_page}, dernière page atteinte")
+                            return False
+
+                        # Scroll et clic
+                        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", next_button)
+                        time.sleep(1)  # Augmenté pour stabilité
+                        self.wait.until(
+                            EC.element_to_be_clickable((By.CSS_SELECTOR, "button.sob-v2-TablePage__btn:last-child")),
+                            message="Bouton 'Suivant' non cliquable"
+                        )
+                        try:
+                            next_button.click()
+                        except ElementClickInterceptedException:
+                            logger.info("Clic intercepté, tentative via JavaScript")
+                            self.driver.execute_script("arguments[0].click();", next_button)
+                        break
+                    except (TimeoutException, StaleElementReferenceException):
+                        logger.warning(f"Échec tentative {retry_click + 1}/3 pour trouver/cliquer 'Suivant'")
+                        if retry_click == 2:
+                            logger.error(f"Échec définitif du clic 'Suivant' sur page {current_page}")
+                            return False
+                        time.sleep(1)
+
+                # Attendre le chargement de la nouvelle page
+                self.wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "table.sob-v2-table")),
+                    message=f"Tableau des clients non chargé après clic 'Suivant' vers page {current_page + 1}"
+                )
+                time.sleep(1)  # Stabilisation
+
+                # Vérifier le changement de page
+                for retry_verify in range(3):
+                    try:
+                        new_page_element = self.driver.find_element(By.CSS_SELECTOR, "span.sob-v2-TablePage")
+                        new_page_text = new_page_element.text.strip()
+                        if not new_page_text.isdigit():
+                            raise ValueError(f"Nouveau numéro de page non numérique: {new_page_text}")
+                        new_page = int(new_page_text)
+                        if new_page != current_page + 1:
+                            logger.error(f"Navigation incorrecte: attendu {current_page + 1}, obtenu {new_page}")
+                            return False
+                        logger.info(f"Passage à la page {new_page}")
+                        return True
+                    except (NoSuchElementException, ValueError, StaleElementReferenceException):
+                        logger.warning(f"Échec vérification page {retry_verify + 1}/3 après navigation")
+                        if retry_verify == 2:
+                            logger.error("Échec définitif de vérification de la nouvelle page")
+                            return False
+                        time.sleep(1)
+
+            except TimeoutException as e:
+                logger.warning(f"Timeout lors de la tentative {attempt}/{max_retries} : {str(e)}")
+                if attempt == max_retries:
+                    logger.error("Échec définitif après retries")
+                    return False
+                time.sleep(2)
+            except Exception as e:
+                logger.error(f"Erreur lors de la tentative {attempt}/{max_retries} : {str(e)}")
+                if attempt == max_retries:
+                    logger.error("Échec définitif après retries")
+                    return False
+                time.sleep(2)
+
+        logger.error("Échec go_to_next_page après toutes les tentatives")
+        return False
 
     def get_cookies_for_requests(self):
+        logger.info("Début get_cookies_for_requests")
         if self.driver:
             cookies = self.driver.get_cookies()
             self.session.cookies.clear()
@@ -254,13 +365,15 @@ class PharmaScraper:
                 self.session.cookies.set(cookie['name'], cookie['value'], domain=cookie['domain'])
             with open(self.cookies_file, 'w') as f:
                 json.dump({"cookies": {c['name']: c['value'] for c in cookies}, "timestamp": time.time()}, f)
-            logger.info("Cookies extraits et sauvegardés dans cookies.json")
+            logger.info(f"Cookies extraits et sauvegardés dans {self.cookies_file}")
         else:
-            logger.warning("Aucun driver actif, utilisation des cookies précédemment chargés")
+            logger.warning(f"Aucun driver actif, utilisation des cookies précédemment chargés depuis {self.cookies_file}")
+        logger.info("Fin get_cookies_for_requests")
 
     def download_detailed_pdf_api_with_requests(self, client, start_date, end_date, timeout=30):
+        logger.info("Début download_detailed_pdf_api_with_requests pour %s", client['nom'])
         url = f"https://api.pharma.sobrus.com/customers/export-customer-statement?type=advanced&start_date={start_date}&end_date={end_date}&customer_id={client['client_id']}"
-        logger.info(f"Téléchargement du PDF détaillé pour {client['nom']} via l'URL: {url}")
+        logger.info(f"Téléchargement du PDF détaillé via l'URL: {url}")
         client_key = client['client_id']
         client_dir = os.path.join(self.download_dir, str(client_key))
         if not os.path.exists(client_dir):
@@ -286,9 +399,26 @@ class PharmaScraper:
             if os.path.exists(pdf_path):
                 os.remove(pdf_path)
             raise
+        finally:
+            logger.info("Fin download_detailed_pdf_api_with_requests")
 
     def cleanup(self):
-        logger.info("Nettoyage scraper")
-        self.driver.quit()
+        logger.info("Début cleanup scraper")
+        try:
+            if hasattr(self, 'driver') and self.driver:
+                logger.info("Fermeture du driver Chrome")
+                self.driver.quit()
+                self.driver = None
+        except Exception as e:
+            logger.error("Erreur lors de la fermeture du driver: %s", str(e))
         if os.path.exists(self.download_dir):
-            shutil.rmtree(self.download_dir)
+            try:
+                shutil.rmtree(self.download_dir)
+                logger.info("Dossier de téléchargement supprimé: %s", self.download_dir)
+            except Exception as e:
+                logger.error("Erreur lors de la suppression du dossier: %s", str(e))
+        logger.info("Fin cleanup scraper")
+
+    def __del__(self):
+        logger.info("Destruction de PharmaScraper")
+        self.cleanup()
